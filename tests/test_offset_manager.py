@@ -69,7 +69,7 @@ class TestKafkaCommitOffsetManager(object):
             offsets[topic_partition] = offset
         return offsets
 
-    def test_watch_message_immediately_updates_increasing_immediate_commit_offsets(self):
+    def test_watch_message_updates_successive_immediate_commit_offsets_immediately(self):
         # Only immediate commit topics (no get_message_id and get_processed_message_ids callables)
         offset_manager = KafkaCommitOffsetManager(topic_processed_message_trackers={})
 
@@ -127,3 +127,29 @@ class TestKafkaCommitOffsetManager(object):
 
         # Second time the stored offsets should be empty
         assert offset_manager.get_offsets_to_commit() == {}
+
+    def test_mark_message_done_marks_message_done(self):
+        done_tracker = self._DummyDoneIdsTracker()
+
+        offset_manager = KafkaCommitOffsetManager(topic_processed_message_trackers={
+            'foo': done_tracker
+        })
+
+        # Messages added but not yet 'done'
+        msg_foo_0 = KafkaMessage(topic='foo', partition=0, offset=100, key='', value=dict(id=1000))
+        msg_foo_10 = KafkaMessage(topic='foo', partition=10, offset=1, key='', value=dict(id=1001))
+        offset_manager.watch_message(msg_foo_0)
+        offset_manager.watch_message(msg_foo_10)
+
+        offset_manager.update_message_states()
+        assert offset_manager.get_offsets_to_commit() == {}
+
+        # Mark message #2 done
+        offset_manager.mark_message_ids_done('foo', [1001])
+        offset_manager.update_message_states()
+        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 10, 1))
+
+        # Mark message #1 done
+        offset_manager.mark_message_ids_done('foo', [1000])
+        offset_manager.update_message_states()
+        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 0, 100))
