@@ -8,6 +8,7 @@ from kafka import KafkaConsumer, KafkaProducer, RoundRobinPartitioner
 from kafka.errors import KafkaError, CommitFailedError
 
 __logger = None
+__old_match_hostname = None
 
 
 def _get_logger():
