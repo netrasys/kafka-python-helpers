@@ -51,7 +51,10 @@ setup(
     author_email='sotescu@netra.io',
     description='Extra functionality for Kafka',
     long_description=LONG_DESCRIPTION,
-    entry_points={},
+    scripts=[
+        'scripts/kafka_consumer.py',
+        'scripts/kafka_producer.py'
+    ],
     packages=['kafka_python_helpers'],
     include_package_data=True,
     platforms='any',
