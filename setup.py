@@ -43,7 +43,8 @@ setup(
     install_requires=[
         'six==1.11.0',
         'sortedcontainers==2.0.3',
-        'kafka-python==1.4.1'
+        'kafka-python==1.4.1',
+        'colorama==0.3.9'
     ],
     tests_require=['pytest', 'pytest-cov'],
     cmdclass={'test': PyTest},
