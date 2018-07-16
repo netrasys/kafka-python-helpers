@@ -104,7 +104,7 @@ def _security_config(ssl_path_prefix):
 
 
 def new_kafka_json_consumer(consumer_name, bootstrap_servers, consumer_group_id, ssl_path_prefix=None,
-                            enable_auto_commit=True):
+                            **kafka_consumer_args):
     @kafka_retriable
     def init_consumer():
         _get_logger().debug("Connecting to Kafka on %s, using group ID '%s'" % (bootstrap_servers, consumer_group_id))
@@ -119,15 +119,16 @@ def new_kafka_json_consumer(consumer_name, bootstrap_servers, consumer_group_id,
                              client_id=consumer_name,
                              group_id=consumer_group_id,
                              value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-                             enable_auto_commit=enable_auto_commit,
                              max_poll_records=20,
                              request_timeout_ms=70000,
-                             session_timeout_ms=60000)
+                             session_timeout_ms=60000,
+                             **kafka_consumer_args)
 
     return init_consumer()
 
 
-def new_kafka_json_producer(bootstrap_servers, ssl_path_prefix=None, partitioner=None):
+def new_kafka_json_producer(bootstrap_servers, ssl_path_prefix=None, partitioner=None,
+                            **kafka_producer_args):
     if partitioner is None:
         partitioner = RoundRobinPartitioner()
 
@@ -146,6 +147,7 @@ def new_kafka_json_producer(bootstrap_servers, ssl_path_prefix=None, partitioner
                              max_block_ms=10000,
                              value_serializer=lambda m: json.dumps(m, cls=_DateTimeJsonEncoder,
                                                                    default=str).encode('utf-8'),
-                             partitioner=partitioner)
+                             partitioner=partitioner,
+                             **kafka_producer_args)
 
     return init_producer()
