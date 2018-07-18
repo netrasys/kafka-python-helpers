@@ -82,8 +82,8 @@ class KafkaMessageOffsetTracker(object):
                 pass
 
     def __repr__(self):
-        return "KafkaMessageOffsetTracker(commit_offset=%d, done_offsets=%s)" % \
-               (self._commit_offset, self._done_offsets)
+        return "KafkaMessageOffsetTracker(commit_offset=%d, dirty=%s, done_offsets=%s)" % \
+               (self._commit_offset, self.dirty(), self._done_offsets)
 
     def dirty(self):
         return self._commit_offset != self._old_commit_offset
@@ -216,6 +216,7 @@ class KafkaCommitOffsetManager(object):
                              for topic, topic_data in six.iteritems(self._topic_data)})
 
     def get_offsets_to_commit(self):
+        # type: () -> dict[int, int]
         """
         Get current list of offsets to commit for all monitored topics and partitions.
         The internal list of offsets is cleared upon return.
@@ -227,7 +228,7 @@ class KafkaCommitOffsetManager(object):
             for partition, tracker in six.iteritems(topic_data.partition_offset_trackers):
                 if tracker.dirty():
                     topic_partition = TopicPartition(topic, partition)
-                    offsets[topic_partition] = OffsetAndMetadata(tracker.get_offset_to_commit_and_reset_dirty(), '')
+                    offsets[topic_partition] = tracker.get_offset_to_commit_and_reset_dirty()
 
         offsets.update(self._immediate_commit_offsets)
         self._immediate_commit_offsets = {}
