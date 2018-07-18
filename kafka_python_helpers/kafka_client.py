@@ -15,7 +15,7 @@ def _get_logger():
     global __logger
     if __logger is None:
         import logging
-        __logger = logging.getLogger('kafka_python_helpers')
+        __logger = logging.getLogger(__name__)
 
     return __logger
     

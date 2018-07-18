@@ -15,33 +15,33 @@ class TestKafkaMessageOffsetTracker(object):
         tracker.pop_id(11)  # should not raise
 
     def test_pop_id_updates_last_offset_with_min_offset_if_not_passed_through_constructor(self):
-        tracker = KafkaMessageOffsetTracker(-1)
+        tracker = KafkaMessageOffsetTracker()
 
         tracker.push_id_and_offset(4, 14)
         tracker.push_id_and_offset(1, 11)
         tracker.push_id_and_offset(2, 12)
         tracker.push_id_and_offset(3, 13)
 
-        # last offset was not known, so we assume it's 10 (before smallest message offset, which is 11)
+        # last offset was not known, so we assume it's 11 (equal to lowest message offset)
         tracker.pop_id(2)
-        assert tracker.last_done_offset() == 10
+        assert tracker.get_offset_to_commit_and_reset_dirty() == 11
 
     def test_pop_id_updates_last_offset(self):
         tracker = KafkaMessageOffsetTracker(10)
         # random order
-        tracker.push_id_and_offset(4, 14)
-        tracker.push_id_and_offset(1, 11)
-        tracker.push_id_and_offset(2, 12)
-        tracker.push_id_and_offset(3, 13)
+        tracker.push_id_and_offset(4, 13)
+        tracker.push_id_and_offset(1, 10)
+        tracker.push_id_and_offset(2, 11)
+        tracker.push_id_and_offset(3, 12)
 
         tracker.pop_id(2)
-        assert tracker.last_done_offset() == 10
+        assert tracker.get_offset_to_commit_and_reset_dirty() == 10
         tracker.pop_id(1)
-        assert tracker.last_done_offset() == 12
+        assert tracker.get_offset_to_commit_and_reset_dirty() == 12
         tracker.pop_id(4)
-        assert tracker.last_done_offset() == 12
+        assert tracker.get_offset_to_commit_and_reset_dirty() == 12
         tracker.pop_id(3)
-        assert tracker.last_done_offset() == 14
+        assert tracker.get_offset_to_commit_and_reset_dirty() == 14
 
 
 class TestKafkaCommitOffsetManager(object):
@@ -82,7 +82,7 @@ class TestKafkaCommitOffsetManager(object):
 
         offset_manager.update_message_states()
 
-        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 0, 101), ('foo', 10, 1))
+        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 0, 102), ('foo', 10, 2))
 
     def test_watch_message_delays_waitable_offsets(self):
         done_tracker = self._DummyDoneIdsTracker()
@@ -101,12 +101,12 @@ class TestKafkaCommitOffsetManager(object):
         # Mark message #2 done
         done_tracker.mark_message_ids_processed([1001])
         offset_manager.update_message_states()
-        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 10, 1))
+        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 10, 2))
 
         # Mark message #1 done
         done_tracker.mark_message_ids_processed([1000])
         offset_manager.update_message_states()
-        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 0, 100))
+        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 0, 101))
 
     def test_get_offsets_to_commit_gets_immediate_commit_offsets_and_done_waitable_offsets_then_clears(self):
         done_tracker = self._DummyDoneIdsTracker()
@@ -123,7 +123,7 @@ class TestKafkaCommitOffsetManager(object):
 
         done_tracker.mark_message_ids_processed([1000])
         offset_manager.update_message_states()
-        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 0, 100), ('bar', 10, 1))
+        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 0, 101), ('bar', 10, 2))
 
         # Second time the stored offsets should be empty
         assert offset_manager.get_offsets_to_commit() == {}
@@ -147,9 +147,9 @@ class TestKafkaCommitOffsetManager(object):
         # Mark message #2 done
         offset_manager.mark_message_ids_done('foo', [1001])
         offset_manager.update_message_states()
-        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 10, 1))
+        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 10, 2))
 
         # Mark message #1 done
         offset_manager.mark_message_ids_done('foo', [1000])
         offset_manager.update_message_states()
-        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 0, 100))
+        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 0, 101))
