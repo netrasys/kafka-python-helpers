@@ -1,15 +1,13 @@
 #!/usr/bin/env python
 from __future__ import print_function
+
 import argparse
-import sys
 
 from kafka.consumer.subscription_state import ConsumerRebalanceListener
 from kafka.errors import CommitFailedError
 from kafka.structs import OffsetAndMetadata
 
-sys.path.append('../daemons')
-
-from lib.kafka_client import new_kafka_json_consumer
+from kafka_python_helpers.kafka_client import new_kafka_json_consumer
 
 
 class MyConsumerRebalanceListener(ConsumerRebalanceListener):

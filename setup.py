@@ -53,6 +53,7 @@ setup(
     long_description=LONG_DESCRIPTION,
     scripts=[
         'scripts/kafka_consumer.py',
+        'scripts/kafka_flush_topic.py',
         'scripts/kafka_producer.py'
     ],
     packages=['kafka_python_helpers'],
