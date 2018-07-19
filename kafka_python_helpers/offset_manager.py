@@ -17,6 +17,12 @@ def _get_logger():
 
 
 class KafkaProcessedMessageTracker(object):
+    """
+    Track messages by their ID (as returned by 'get_message_id').
+    WARNING: You should not use the same instance for multiple topics, as 'reset' is global
+             and it is called per topic from KafkaCommitOffsetManager.
+    """
+
     def get_message_id(self, message):
         """
         Returns the ID of the message (such as 'request_id').
@@ -35,6 +41,12 @@ class KafkaProcessedMessageTracker(object):
         """
         Manually mark some message IDs as "processed".
         They must be returned by the next call to 'get_processed_message_ids'.
+        """
+        raise NotImplementedError
+
+    def reset(self):
+        """
+        Clear all tracked messages.
         """
         raise NotImplementedError
 
@@ -161,6 +173,19 @@ class KafkaCommitOffsetManager(object):
 
         return all_processed_ids
 
+    def reset_topic(self, topic):
+        """
+        Clear a topic's state.
+        :param topic: topic name
+        """
+        topic_data = self._topic_data.get(topic)
+        if topic_data is None:
+            return
+
+        _get_logger().debug("KafkaCommitOffsetManager: Resetting offsets for topic '%s'" % topic)
+        topic_data.processed_message_tracker.reset()
+        topic_data.partition_offset_trackers.clear()
+
     def watch_message(self, msg):
         """
         Watch a message for "done-ness".
@@ -173,12 +198,12 @@ class KafkaCommitOffsetManager(object):
 
         topic_partition = TopicPartition(msg.topic, msg.partition)
         if self._topic_has_immediate_commit(msg.topic):
-            offset_meta = self._immediate_commit_offsets.pop(topic_partition, None)
+            offset = self._immediate_commit_offsets.pop(topic_partition, None)
 
             # The commit offset is actually the offset of the *next* message to be consumed
             # (i.e. the offset of the last consumed message plus one)
-            if offset_meta is None or offset_meta.offset < msg.offset + 1:
-                self._immediate_commit_offsets[topic_partition] = OffsetAndMetadata(msg.offset + 1, '')
+            if offset is None or offset < msg.offset + 1:
+                self._immediate_commit_offsets[topic_partition] = msg.offset + 1
                 return True
         else:
             return self._track_message_offset(msg)
@@ -216,7 +241,7 @@ class KafkaCommitOffsetManager(object):
                              for topic, topic_data in six.iteritems(self._topic_data)})
 
     def get_offsets_to_commit(self):
-        # type: () -> dict[int, int]
+        # type: () -> dict[TopicPartition, int]
         """
         Get current list of offsets to commit for all monitored topics and partitions.
         The internal list of offsets is cleared upon return.

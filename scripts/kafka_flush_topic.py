@@ -57,8 +57,7 @@ def flush_topic(servers, certs_path_prefix, topic, group):
     retry = True
     while retry:
         try:
-            consumer._coordinator.ensure_active_group()
-            consumer._coordinator.commit_offsets_sync(end_positions)
+            consumer.commit(end_positions)
             retry = False
         except CommitFailedError:
             pass

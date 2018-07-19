@@ -60,12 +60,15 @@ class TestKafkaCommitOffsetManager(object):
         def mark_message_ids_processed(self, message_ids):
             self.done_ids.extend(message_ids)
 
+        def reset(self):
+            self.done_ids = []
+
     @staticmethod
     def _build_offsets(*tuples):
         offsets = {}
         for t in tuples:
             topic_partition = TopicPartition(t[0], t[1])
-            offset = OffsetAndMetadata(t[2], '')
+            offset = t[2]
             offsets[topic_partition] = offset
         return offsets
 
@@ -153,3 +156,32 @@ class TestKafkaCommitOffsetManager(object):
         offset_manager.mark_message_ids_done('foo', [1000])
         offset_manager.update_message_states()
         assert offset_manager.get_offsets_to_commit() == self._build_offsets(('foo', 0, 101))
+
+    def test_reset_topic_resets_single_topic(self):
+        done_tracker_foo = self._DummyDoneIdsTracker()
+        done_tracker_bar = self._DummyDoneIdsTracker()
+
+        offset_manager = KafkaCommitOffsetManager(topic_processed_message_trackers={
+            'foo': done_tracker_foo,
+            'bar': done_tracker_bar
+        })
+
+        # Messages added but not yet 'done'
+        msg_foo = KafkaMessage(topic='foo', partition=0, offset=100, key='', value=dict(id=1000))
+        msg_bar = KafkaMessage(topic='bar', partition=10, offset=1, key='', value=dict(id=1001))
+        offset_manager.watch_message(msg_foo)
+        offset_manager.watch_message(msg_bar)
+        offset_manager.mark_message_ids_done('foo', [1000])
+        offset_manager.mark_message_ids_done('bar', [1001])
+
+        assert done_tracker_foo.done_ids == [1000]
+        assert done_tracker_bar.done_ids == [1001]
+
+        offset_manager.reset_topic('foo')
+
+        assert done_tracker_foo.done_ids == []  # cleared
+        assert done_tracker_bar.done_ids == [1001]
+
+        offset_manager.update_message_states()
+        assert offset_manager.get_offsets_to_commit() == self._build_offsets(('bar', 10, 2))
+
