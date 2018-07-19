@@ -44,9 +44,9 @@ class KafkaProcessedMessageTracker(object):
         """
         raise NotImplementedError
 
-    def reset(self):
+    def remove_message_ids(self, message_ids):
         """
-        Clear all tracked messages.
+        Removes message IDs from tracking.
         """
         raise NotImplementedError
 
@@ -93,6 +93,14 @@ class KafkaMessageOffsetTracker(object):
             except ValueError:
                 pass
 
+    def filter_popped_ids(self, ids):
+        """
+        Return a set of ids in 'ids' that are no longer tracked.
+        :param ids: iterable of message IDs
+        :return: set
+        """
+        return {id for id in ids if id not in self._ids_to_offsets}
+
     def __repr__(self):
         return "KafkaMessageOffsetTracker(commit_offset=%d, dirty=%s, done_offsets=%s)" % \
                (self._commit_offset, self.dirty(), self._done_offsets)
@@ -118,6 +126,7 @@ class KafkaCommitOffsetManager(object):
         """
         self._topic_data = {}
         self._message_topic_partitions = {}
+        self._topic_partition_messages = defaultdict(set)
         self._processed_message_trackers = set()
 
         _get_logger().debug("KafkaCommitOffsetManager: Tracking %s" % topic_processed_message_trackers.keys())
@@ -158,7 +167,10 @@ class KafkaCommitOffsetManager(object):
 
         tracker.push_id_and_offset(msg_id, msg.offset)
 
-        self._message_topic_partitions[msg_id] = TopicPartition(msg.topic, msg.partition)
+        topic_partition = TopicPartition(msg.topic, msg.partition)
+        self._message_topic_partitions[msg_id] = topic_partition
+        self._topic_partition_messages[topic_partition].add(msg_id)
+
         return True
 
     def _get_all_processed_message_ids(self):
@@ -173,18 +185,26 @@ class KafkaCommitOffsetManager(object):
 
         return all_processed_ids
 
-    def reset_topic(self, topic):
+    def reset_topic_partition(self, topic, partition):
         """
-        Clear a topic's state.
+        Clear a topic partition's state.
         :param topic: topic name
+        :param partition: partition index
         """
-        topic_data = self._topic_data.get(topic)
-        if topic_data is None:
-            return
+        _get_logger().debug("KafkaCommitOffsetManager: Resetting offsets for topic '%s' partition %d" %
+                            (topic, partition))
 
-        _get_logger().debug("KafkaCommitOffsetManager: Resetting offsets for topic '%s'" % topic)
-        topic_data.processed_message_tracker.reset()
-        topic_data.partition_offset_trackers.clear()
+        topic_partition = TopicPartition(topic, partition)
+
+        if self._topic_has_immediate_commit(topic):
+            self._immediate_commit_offsets.pop(topic_partition, None)
+        else:
+            topic_data = self._topic_data.get(topic)
+
+            msg_ids = self._topic_partition_messages.pop(topic_partition, set())
+            topic_data.processed_message_tracker.remove_message_ids(list(msg_ids))
+
+            topic_data.partition_offset_trackers.pop(partition, None)
 
     def watch_message(self, msg):
         """
@@ -240,7 +260,7 @@ class KafkaCommitOffsetManager(object):
                             {topic: dict(topic_data.partition_offset_trackers)
                              for topic, topic_data in six.iteritems(self._topic_data)})
 
-    def get_offsets_to_commit(self):
+    def pop_offsets_to_commit(self):
         # type: () -> dict[TopicPartition, int]
         """
         Get current list of offsets to commit for all monitored topics and partitions.
@@ -254,6 +274,11 @@ class KafkaCommitOffsetManager(object):
                 if tracker.dirty():
                     topic_partition = TopicPartition(topic, partition)
                     offsets[topic_partition] = tracker.get_offset_to_commit_and_reset_dirty()
+
+                    # Remove committed or committable messages
+                    partition_msg_ids = self._topic_partition_messages[topic_partition]
+                    partition_msg_ids -= tracker.filter_popped_ids(partition_msg_ids)
+                    print "SORIN: %r" % partition_msg_ids
 
         offsets.update(self._immediate_commit_offsets)
         self._immediate_commit_offsets = {}
