@@ -1,7 +1,7 @@
 from collections import defaultdict, namedtuple
 
 import six
-from kafka import TopicPartition, OffsetAndMetadata
+from kafka import TopicPartition
 from sortedcontainers import SortedList
 
 __logger = None
@@ -49,6 +49,28 @@ class KafkaProcessedMessageTracker(object):
         Removes message IDs from tracking.
         """
         raise NotImplementedError
+
+
+class KafkaBasicProcessedMessageTracker(KafkaProcessedMessageTracker):
+    def __init__(self, lock_class):
+        self._lock = lock_class()
+        self._processed_ids = set()
+
+    def get_message_id(self, message):
+        raise NotImplementedError
+
+    def get_processed_message_ids(self):
+        with self._lock:
+            ids = self._processed_ids
+            self._processed_ids = set()
+            return list(ids)
+
+    def mark_message_ids_processed(self, message_ids):
+        with self._lock:
+            self._processed_ids.update(message_ids)
+
+    def remove_message_ids(self, message_ids):
+        self._processed_ids -= set(message_ids)
 
 
 class KafkaMessageOffsetTracker(object):
