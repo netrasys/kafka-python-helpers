@@ -86,7 +86,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if len(args.topic) > 1:
-        colorama.init(autoreset=True)
+        colorama.init(autoreset=True, strip=False)
         print_func = topic_print_colorama
     else:
         print_func = topic_print_default
