@@ -26,17 +26,23 @@ class KafkaTopicExchange(ConsumerRebalanceListener):
     def __init__(self, bootstrap_servers, ssl_path_prefix,
                  topic,
                  consumer_name, consumer_group_id,
+                 consumer_extra_args=None,
                  producer=None,
+                 producer_extra_args=None,
                  rebalance_listener=None):
         self._topic = topic
         self._rebalance_listener = rebalance_listener
+
+        consumer_args = dict(enable_auto_commit=False,
+                             auto_offset_reset='earliest')
+        if consumer_extra_args is not None:
+            consumer_args.update(consumer_extra_args)
 
         self._kafka_consumer = new_kafka_json_consumer(consumer_name=consumer_name,
                                                        bootstrap_servers=bootstrap_servers,
                                                        consumer_group_id=consumer_group_id,
                                                        ssl_path_prefix=ssl_path_prefix,
-                                                       enable_auto_commit=False,
-                                                       auto_offset_reset='earliest')
+                                                       **consumer_args)
         self._kafka_consumer.subscribe(topics=[topic],
                                        listener=self)
 
@@ -45,8 +51,13 @@ class KafkaTopicExchange(ConsumerRebalanceListener):
         if producer is not None:
             self._kafka_producer = producer
         else:
+            producer_args = {}
+            if producer_extra_args is not None:
+                producer_args.update(producer_extra_args)
+
             self._kafka_producer = new_kafka_json_producer(bootstrap_servers=bootstrap_servers,
-                                                           ssl_path_prefix=ssl_path_prefix)
+                                                           ssl_path_prefix=ssl_path_prefix,
+                                                           **producer_args)
 
     def set_rebalance_listener(self, rebalance_listener):
         self._rebalance_listener = rebalance_listener
