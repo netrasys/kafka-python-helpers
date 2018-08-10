@@ -300,7 +300,6 @@ class KafkaCommitOffsetManager(object):
                     # Remove committed or committable messages
                     partition_msg_ids = self._topic_partition_messages[topic_partition]
                     partition_msg_ids -= tracker.filter_popped_ids(partition_msg_ids)
-                    print "SORIN: %r" % partition_msg_ids
 
         offsets.update(self._immediate_commit_offsets)
         self._immediate_commit_offsets = {}
