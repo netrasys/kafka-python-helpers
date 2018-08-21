@@ -151,7 +151,7 @@ class KafkaCommitOffsetManager(object):
         self._topic_partition_messages = defaultdict(set)
         self._processed_message_trackers = set()
 
-        _get_logger().debug("KafkaCommitOffsetManager: Tracking %s" % topic_processed_message_trackers.keys())
+        _get_logger().debug("KafkaCommitOffsetManager: Tracking %s" % list(topic_processed_message_trackers.keys()))
 
         for topic, tracker in six.iteritems(topic_processed_message_trackers):
             if not isinstance(tracker, KafkaProcessedMessageTracker):

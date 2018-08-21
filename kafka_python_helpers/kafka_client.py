@@ -46,7 +46,7 @@ def _patch_ssl_IP_SAN_check():
         if cert:
             san = cert.get('subjectAltName')
             if san:
-                new_san = map(lambda kv: ('DNS' if kv[0] == 'IP Address' else kv[0], kv[1]), san)
+                new_san = [('DNS' if kv[0] == 'IP Address' else kv[0], kv[1]) for kv in san]
                 cert['subjectAltName'] = new_san
 
         return __old_match_hostname(cert, hostname)

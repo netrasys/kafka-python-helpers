@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import print_function
+
 
 import argparse
 
@@ -45,7 +45,7 @@ def flush_topic(servers, certs_path_prefix, topic, group):
 
     consumer.seek_to_end()
     end_positions = {
-        partition: OffsetAndMetadata(consumer.position(partition), u'')
+        partition: OffsetAndMetadata(consumer.position(partition), '')
         for partition in assigned_partitions
     }
 
