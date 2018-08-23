@@ -111,6 +111,11 @@ def new_kafka_json_consumer(consumer_name, bootstrap_servers, consumer_group_id,
 
         security_cfg = _security_config(ssl_path_prefix)
 
+        extra_args = dict(max_poll_records=20,
+                          request_timeout_ms=70000,
+                          session_timeout_ms=60000)
+        extra_args.update(kafka_consumer_args)
+
         return KafkaConsumer(bootstrap_servers=bootstrap_servers,
                              security_protocol=security_cfg['security_protocol'],
                              ssl_cafile=security_cfg['ssl_cafile'],
@@ -119,10 +124,7 @@ def new_kafka_json_consumer(consumer_name, bootstrap_servers, consumer_group_id,
                              client_id=consumer_name,
                              group_id=consumer_group_id,
                              value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-                             max_poll_records=20,
-                             request_timeout_ms=70000,
-                             session_timeout_ms=60000,
-                             **kafka_consumer_args)
+                             **extra_args)
 
     return init_consumer()
 
@@ -138,16 +140,18 @@ def new_kafka_json_producer(bootstrap_servers, ssl_path_prefix=None, partitioner
 
         security_cfg = _security_config(ssl_path_prefix)
 
+        extra_args = dict(retries=5,
+                          max_block_ms=10000,
+                          partitioner=partitioner)
+        extra_args.update(kafka_producer_args)
+
         return KafkaProducer(bootstrap_servers=bootstrap_servers,
                              security_protocol=security_cfg['security_protocol'],
                              ssl_cafile=security_cfg['ssl_cafile'],
                              ssl_certfile=security_cfg['ssl_certfile'],
                              ssl_keyfile=security_cfg['ssl_keyfile'],
-                             retries=5,
-                             max_block_ms=10000,
                              value_serializer=lambda m: json.dumps(m, cls=_DateTimeJsonEncoder,
                                                                    default=str).encode('utf-8'),
-                             partitioner=partitioner,
-                             **kafka_producer_args)
+                             **extra_args)
 
     return init_producer()
