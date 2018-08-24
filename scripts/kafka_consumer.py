@@ -49,7 +49,8 @@ def topic_print_default(_topic, txt):
     print(txt)
 
 
-def consume_topics(servers, certs_path_prefix, topics, group, enable_auto_commit, print_raw, print_func):
+def consume_topics(servers, certs_path_prefix, topics, group, enable_auto_commit, auto_offset_reset,
+                   print_raw, print_func):
     print("Connecting to Kafka servers %s and subscribing to %s in consumer group '%s' - this might take a while..." %
           (servers, topics, group))
 
@@ -57,7 +58,8 @@ def consume_topics(servers, certs_path_prefix, topics, group, enable_auto_commit
                                        bootstrap_servers=servers,
                                        consumer_group_id=group,
                                        ssl_path_prefix=certs_path_prefix,
-                                       enable_auto_commit=enable_auto_commit)
+                                       enable_auto_commit=enable_auto_commit,
+                                       auto_offset_reset=auto_offset_reset)
 
     consumer.subscribe(topics, listener=MyConsumerRebalanceListener())
 
@@ -81,6 +83,9 @@ if __name__ == '__main__':
                         default=None)
     parser.add_argument('--no-offset-commit', help="Don't commit consumer offsets (i.e. don't advance)",
                         action='store_true')
+    parser.add_argument('--since-offset', choices=('earliest', 'latest'),
+                        help="Start from earliest or latest offset",
+                        default='latest')
     parser.add_argument('-r', '--raw', help='Print raw messages (as received from Kafka)', action='store_true')
     parser.add_argument('topic', help='Kafka topic(s) to consume from', nargs='+')
     args = parser.parse_args()
@@ -96,5 +101,6 @@ if __name__ == '__main__':
                    topics=args.topic,
                    group=args.group,
                    enable_auto_commit=not args.no_offset_commit,
+                   auto_offset_reset=args.since_offset,
                    print_raw=args.raw,
                    print_func=print_func)
