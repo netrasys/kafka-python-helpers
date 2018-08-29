@@ -116,6 +116,9 @@ class KafkaTopicExchange(object):
                                                            ssl_path_prefix=ssl_path_prefix,
                                                            **producer_args)
 
+    def set_consumer_rebalance_listener(self, rebalance_listener):
+        self._topic_consumer.set_rebalance_listener(rebalance_listener)
+
     def consume(self, timeout_ms=None):
         return self._topic_consumer.consume(timeout_ms)
 
@@ -138,6 +141,7 @@ class KafkaTopicCommitOffsetManager(object):
         self._commit_offset_manager.mark_message_ids_done(topic=self._topic, msg_ids=msg_ids)
 
     def get_offsets_to_commit(self):
+        # type: () -> dict[int, int]
         return {tp.partition: offset
                 for tp, offset in six.iteritems(self._commit_offset_manager.pop_offsets_to_commit())}
 
