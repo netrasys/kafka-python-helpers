@@ -28,6 +28,7 @@ class KafkaTopicConsumer(ConsumerRebalanceListener):
                  consumer_name, consumer_group_id,
                  rebalance_listener=None,
                  **consumer_extra_args):
+        self._paused = False
         self._topic = topic
         self._rebalance_listener = rebalance_listener
 
@@ -58,10 +59,15 @@ class KafkaTopicConsumer(ConsumerRebalanceListener):
     def pause_all_partitions(self):
         partitions = self._kafka_consumer.assignment()
         self._kafka_consumer.pause(*partitions)
+        self._paused = True
 
     def resume_all_partitions(self):
         partitions = self._kafka_consumer.paused()
         self._kafka_consumer.resume(*list(partitions))
+        self._paused = False
+
+    def is_paused(self):
+        return self._paused
 
     def on_partitions_assigned(self, assigned):
         _get_logger().info("Kafka rebalance, partitions assigned: %s" % assigned)
