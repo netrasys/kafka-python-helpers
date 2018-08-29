@@ -22,42 +22,24 @@ def convert_partition_offsets(topic, partition_offsets):
             for partition, offset in six.iteritems(partition_offsets)}
 
 
-class KafkaTopicExchange(ConsumerRebalanceListener):
+class KafkaTopicConsumer(ConsumerRebalanceListener):
     def __init__(self, bootstrap_servers, ssl_path_prefix,
                  topic,
                  consumer_name, consumer_group_id,
-                 consumer_extra_args=None,
-                 producer=None,
-                 producer_extra_args=None,
-                 rebalance_listener=None):
+                 rebalance_listener=None,
+                 **consumer_extra_args):
         self._topic = topic
         self._rebalance_listener = rebalance_listener
-
-        consumer_args = dict(enable_auto_commit=False,
-                             auto_offset_reset='earliest')
-        if consumer_extra_args is not None:
-            consumer_args.update(consumer_extra_args)
 
         self._kafka_consumer = new_kafka_json_consumer(consumer_name=consumer_name,
                                                        bootstrap_servers=bootstrap_servers,
                                                        consumer_group_id=consumer_group_id,
                                                        ssl_path_prefix=ssl_path_prefix,
-                                                       **consumer_args)
+                                                       **consumer_extra_args)
         self._kafka_consumer.subscribe(topics=[topic],
                                        listener=self)
 
-        _get_logger().info("KafkaTopicExchange: subscribed to Kafka topic '%s'" % topic)
-
-        if producer is not None:
-            self._kafka_producer = producer
-        else:
-            producer_args = {}
-            if producer_extra_args is not None:
-                producer_args.update(producer_extra_args)
-
-            self._kafka_producer = new_kafka_json_producer(bootstrap_servers=bootstrap_servers,
-                                                           ssl_path_prefix=ssl_path_prefix,
-                                                           **producer_args)
+        _get_logger().info("KafkaTopicConsumer: subscribed to Kafka topic '%s'" % topic)
 
     def set_rebalance_listener(self, rebalance_listener):
         self._rebalance_listener = rebalance_listener
@@ -73,9 +55,6 @@ class KafkaTopicExchange(ConsumerRebalanceListener):
         _get_logger().debug("Commit offsets: %s" % repr(offsets))
         self._kafka_consumer.commit(offsets)
 
-    def send(self, msg, partition):
-        return self._kafka_producer.send(self._topic, partition=partition, value=msg)
-
     def on_partitions_assigned(self, assigned):
         _get_logger().info("Kafka rebalance, partitions assigned: %s" % assigned)
         if self._rebalance_listener is not None:
@@ -87,6 +66,53 @@ class KafkaTopicExchange(ConsumerRebalanceListener):
         if self._rebalance_listener is not None:
             partitions = [tp.partition for tp in revoked]
             self._rebalance_listener.on_partitions_revoked(partitions)
+
+
+class KafkaTopicExchange(object):
+    def __init__(self, bootstrap_servers, ssl_path_prefix,
+                 topic,
+                 consumer_name, consumer_group_id,
+                 consumer_extra_args=None,
+                 producer=None,
+                 producer_extra_args=None,
+                 rebalance_listener=None):
+        self._topic = topic
+
+        consumer_args = dict(enable_auto_commit=False,
+                             auto_offset_reset='earliest')
+        if consumer_extra_args is not None:
+            consumer_args.update(consumer_extra_args)
+
+        self._topic_consumer = KafkaTopicConsumer(bootstrap_servers=bootstrap_servers,
+                                                  ssl_path_prefix=ssl_path_prefix,
+                                                  topic=topic,
+                                                  consumer_name=consumer_name,
+                                                  consumer_group_id=consumer_group_id,
+                                                  rebalance_listener=rebalance_listener,
+                                                  **consumer_args)
+
+        if producer is not None:
+            self._kafka_producer = producer
+        else:
+            producer_args = {}
+            if producer_extra_args is not None:
+                producer_args.update(producer_extra_args)
+
+            self._kafka_producer = new_kafka_json_producer(bootstrap_servers=bootstrap_servers,
+                                                           ssl_path_prefix=ssl_path_prefix,
+                                                           **producer_args)
+
+    def consume(self, timeout_ms=None):
+        return self._topic_consumer.consume(timeout_ms)
+
+    def commit_offsets(self, partition_offsets):
+        """
+        :type partition_offsets: dict[int, int]
+        """
+        self._topic_consumer.commit_offsets(partition_offsets)
+
+    def send(self, msg, partition):
+        return self._kafka_producer.send(self._topic, partition=partition, value=msg)
 
 
 class KafkaTopicCommitOffsetManager(object):
