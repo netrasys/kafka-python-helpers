@@ -55,6 +55,14 @@ class KafkaTopicConsumer(ConsumerRebalanceListener):
         _get_logger().debug("Commit offsets: %s" % repr(offsets))
         self._kafka_consumer.commit(offsets)
 
+    def pause_all_partitions(self):
+        partitions = self._kafka_consumer.assignment()
+        self._kafka_consumer.pause(*partitions)
+
+    def resume_all_partitions(self):
+        partitions = self._kafka_consumer.paused()
+        self._kafka_consumer.resume(*list(partitions))
+
     def on_partitions_assigned(self, assigned):
         _get_logger().info("Kafka rebalance, partitions assigned: %s" % assigned)
         if self._rebalance_listener is not None:
