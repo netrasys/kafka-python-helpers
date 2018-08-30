@@ -94,8 +94,6 @@ class TestKafkaCommitOffsetManager(object):
 
         offset_manager.watch_message(KafkaMessage(topic='foo', partition=10, offset=1, key='', value=''))
 
-        offset_manager.update_message_states()
-
         assert offset_manager.pop_offsets_to_commit() == self._build_offsets(('foo', 0, 102), ('foo', 10, 2))
 
     def test_watch_message_delays_waitable_offsets(self):
@@ -109,17 +107,14 @@ class TestKafkaCommitOffsetManager(object):
         offset_manager.watch_message(KafkaMessage(topic='foo', partition=0, offset=100, key='', value=dict(id=1000)))
         offset_manager.watch_message(KafkaMessage(topic='foo', partition=10, offset=1, key='', value=dict(id=1001)))
 
-        offset_manager.update_message_states()
         assert offset_manager.pop_offsets_to_commit() == {}
 
         # Mark message #2 done
         done_tracker.mark_message_ids_processed([1001])
-        offset_manager.update_message_states()
         assert offset_manager.pop_offsets_to_commit() == self._build_offsets(('foo', 10, 2))
 
         # Mark message #1 done
         done_tracker.mark_message_ids_processed([1000])
-        offset_manager.update_message_states()
         assert offset_manager.pop_offsets_to_commit() == self._build_offsets(('foo', 0, 101))
 
     def test_pop_offsets_to_commit_gets_immediate_commit_offsets_and_done_waitable_offsets_then_clears(self):
@@ -136,7 +131,6 @@ class TestKafkaCommitOffsetManager(object):
         offset_manager.watch_message(KafkaMessage(topic='bar', partition=10, offset=1, key='', value=''))
 
         done_tracker.mark_message_ids_processed([1000])
-        offset_manager.update_message_states()
         assert offset_manager.pop_offsets_to_commit() == self._build_offsets(('foo', 0, 101), ('bar', 10, 2))
 
         # Second time the stored offsets should be empty
@@ -158,7 +152,6 @@ class TestKafkaCommitOffsetManager(object):
 
         done_tracker.mark_message_ids_processed([1000, 1001])
 
-        offset_manager.update_message_states()
         offset_manager.pop_offsets_to_commit()
 
         # Ugly to look at internals, but couldn't think of another way (it's late)
@@ -177,17 +170,14 @@ class TestKafkaCommitOffsetManager(object):
         offset_manager.watch_message(msg_foo_0)
         offset_manager.watch_message(msg_foo_10)
 
-        offset_manager.update_message_states()
         assert offset_manager.pop_offsets_to_commit() == {}
 
         # Mark message #2 done
         offset_manager.mark_message_ids_done('foo', [1001])
-        offset_manager.update_message_states()
         assert offset_manager.pop_offsets_to_commit() == self._build_offsets(('foo', 10, 2))
 
         # Mark message #1 done
         offset_manager.mark_message_ids_done('foo', [1000])
-        offset_manager.update_message_states()
         assert offset_manager.pop_offsets_to_commit() == self._build_offsets(('foo', 0, 101))
 
     def test_reset_topic_partition_resets_single_topic_partition(self):
@@ -218,6 +208,5 @@ class TestKafkaCommitOffsetManager(object):
         assert done_tracker_foo.done_ids == [1001]
         assert done_tracker_bar.done_ids == [2000]
 
-        offset_manager.update_message_states()
         assert offset_manager.pop_offsets_to_commit() == self._build_offsets(('foo', 1, 11), ('bar', 10, 2))
 

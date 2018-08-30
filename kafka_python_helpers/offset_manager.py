@@ -265,10 +265,9 @@ class KafkaCommitOffsetManager(object):
         tracker = self._processed_message_tracker(topic)
         tracker.mark_message_ids_processed(msg_ids)
 
-    def update_message_states(self):
+    def _update_message_states(self):
         """
         Update "done" offsets for all monitored topics and partitions.
-        Must be called before 'get_offsets_to_commit'.
         :return:
         """
         processed_ids = self._get_all_processed_message_ids()
@@ -290,6 +289,8 @@ class KafkaCommitOffsetManager(object):
         :return: list of OffsetAndMetadata to commit
         """
         offsets = {}
+
+        self._update_message_states()
 
         for topic, topic_data in six.iteritems(self._topic_data):
             for partition, tracker in six.iteritems(topic_data.partition_offset_trackers):
