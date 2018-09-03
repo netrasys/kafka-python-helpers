@@ -4,6 +4,8 @@ import six
 from kafka import TopicPartition
 from sortedcontainers import SortedList
 
+from kafka_python_helpers.utils import compact_int_list
+
 __logger = None
 
 
@@ -125,7 +127,7 @@ class KafkaMessageOffsetTracker(object):
 
     def __repr__(self):
         return "KafkaMessageOffsetTracker(commit_offset=%d, dirty=%s, done_offsets=%s)" % \
-               (self._commit_offset, self.dirty(), self._done_offsets)
+               (self._commit_offset, self.dirty(), compact_int_list(self._done_offsets))
 
     def dirty(self):
         return self._commit_offset != self._old_commit_offset
