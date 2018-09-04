@@ -24,7 +24,7 @@ class TestKafkaMessageOffsetTracker(object):
 
         # last offset was not known, so we assume it's 11 (equal to lowest message offset)
         tracker.pop_id(2)
-        assert tracker.get_offset_to_commit_and_reset_dirty() == 11
+        assert tracker.get_offset_to_commit() == 11
 
     def test_pop_id_updates_last_offset(self):
         tracker = KafkaMessageOffsetTracker(10)
@@ -35,15 +35,15 @@ class TestKafkaMessageOffsetTracker(object):
         tracker.push_id_and_offset(3, 12)
 
         tracker.pop_id(2)
-        assert tracker.get_offset_to_commit_and_reset_dirty() == 10
+        assert tracker.get_offset_to_commit() == 10
         tracker.pop_id(1)
-        assert tracker.get_offset_to_commit_and_reset_dirty() == 12
+        assert tracker.get_offset_to_commit() == 12
         tracker.pop_id(4)
-        assert tracker.get_offset_to_commit_and_reset_dirty() == 12
+        assert tracker.get_offset_to_commit() == 12
         tracker.pop_id(3)
-        assert tracker.get_offset_to_commit_and_reset_dirty() == 14
+        assert tracker.get_offset_to_commit() == 14
 
-    def test_filter_popped_ids_returns_untracked_ids_in_list(self):
+    def test_get_done_ids_returns_popped_ids(self):
         tracker = KafkaMessageOffsetTracker()
 
         tracker.push_id_and_offset(1, 11)
@@ -51,7 +51,39 @@ class TestKafkaMessageOffsetTracker(object):
         tracker.push_id_and_offset(3, 13)
         tracker.push_id_and_offset(4, 14)
 
-        assert tracker.filter_popped_ids([1, 2, 5]) == {5}
+        tracker.pop_id(2)
+        tracker.pop_id(4)
+
+        assert tracker.get_done_ids() == {2, 4}
+
+    def test_get_all_ids_returns_all_ids(self):
+        tracker = KafkaMessageOffsetTracker()
+
+        tracker.push_id_and_offset(1, 11)
+        tracker.push_id_and_offset(2, 12)
+        tracker.push_id_and_offset(3, 13)
+        tracker.push_id_and_offset(4, 14)
+
+        tracker.pop_id(2)
+        tracker.pop_id(4)
+
+        assert tracker.get_all_ids() == {1, 2, 3, 4}
+
+    def test_clear_dirty_resets_done_ids(self):
+        tracker = KafkaMessageOffsetTracker()
+
+        tracker.push_id_and_offset(1, 11)
+        tracker.push_id_and_offset(2, 12)
+        tracker.push_id_and_offset(3, 13)
+        tracker.push_id_and_offset(4, 14)
+
+        tracker.pop_id(2)
+        tracker.pop_id(4)
+
+        assert tracker.get_done_ids() == {2, 4}
+
+        tracker.clear_dirty()
+        assert tracker.get_done_ids() == set()
 
 
 class TestKafkaCommitOffsetManager(object):
@@ -62,7 +94,7 @@ class TestKafkaCommitOffsetManager(object):
         def get_message_id(self, message):
             return message['id']
 
-        def get_processed_message_ids(self):
+        def get_and_clear_processed_message_ids(self):
             ids = self.done_ids
             self.done_ids = []
             return ids
@@ -152,10 +184,10 @@ class TestKafkaCommitOffsetManager(object):
 
         done_tracker.mark_message_ids_processed([1000, 1001])
 
-        offset_manager.pop_offsets_to_commit()
+        assert offset_manager.pop_offsets_to_commit() == {TopicPartition(topic='foo', partition=0): 102}
 
-        # Ugly to look at internals, but couldn't think of another way (it's late)
-        assert offset_manager._topic_partition_messages == {TopicPartition('foo', 0): {1002}}
+        # Should be empty the second time around
+        assert offset_manager.pop_offsets_to_commit() == {}
 
     def test_mark_message_done_marks_message_done(self):
         done_tracker = self._DummyDoneIdsTracker()
