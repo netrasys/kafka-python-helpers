@@ -1,4 +1,6 @@
-from itertools import izip, islice
+from itertools import islice
+
+from six.moves import zip
 
 
 def compact_int_list(lst):
@@ -10,7 +12,7 @@ def compact_int_list(lst):
     results = []
 
     start = lst[0]
-    for a, b in izip(lst, islice(lst, 1, None)):
+    for a, b in zip(lst, islice(lst, 1, None)):
         if b != a + 1:
             results.append((start, a))
             start = b
