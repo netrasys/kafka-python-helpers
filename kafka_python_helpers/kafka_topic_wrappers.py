@@ -48,7 +48,7 @@ class KafkaTopicConsumer(ConsumerRebalanceListener):
     def consume(self, timeout_ms=None):
         return self._kafka_consumer.poll(timeout_ms)
 
-    def commit_offsets(self, partition_offsets):
+    def commit_offsets(self, partition_offsets=None):
         """
         :type partition_offsets: dict[int, int]
         """
