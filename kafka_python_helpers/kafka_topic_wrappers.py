@@ -52,10 +52,14 @@ class KafkaTopicConsumer(ConsumerRebalanceListener):
         """
         :type partition_offsets: dict[int, int]
         """
-        offsets = convert_partition_offsets(self._topic, partition_offsets)
-        if offsets:
-            _get_logger().debug("Commit offsets: %s" % repr(offsets))
-            self._kafka_consumer.commit(offsets)
+        if partition_offsets is None:
+            _get_logger().debug("Commit all '%s' offsets" % self._topic)
+            self._kafka_consumer.commit()
+        else:
+            offsets = convert_partition_offsets(self._topic, partition_offsets)
+            if offsets:
+                _get_logger().debug("Commit offsets: %s" % repr(offsets))
+                self._kafka_consumer.commit(offsets)
 
     def pause_all_partitions(self):
         partitions = self._kafka_consumer.assignment()
