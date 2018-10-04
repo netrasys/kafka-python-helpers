@@ -53,7 +53,7 @@ class KafkaTopicConsumer(ConsumerRebalanceListener):
         :type partition_offsets: dict[int, int]
         """
         if partition_offsets is None:
-            _get_logger().debug("Commit all '%s' offsets" % self._topic)
+            # _get_logger().debug("Commit all '%s' offsets" % self._topic)
             self._kafka_consumer.commit()
         else:
             offsets = convert_partition_offsets(self._topic, partition_offsets)
