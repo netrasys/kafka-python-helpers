@@ -217,7 +217,7 @@ class KafkaCommitOffsetManager(object):
         When it is done, its consumer offset can be committed.
         :type msg: KafkaMessage
         :rtype: bool
-        :returns True if message was added, False if it was discarded
+        :returns True if message was added, False if it was a duplicate (therefore discarded)
         """
         msg_id = self._get_message_id(msg)
         offset_tracker = self._partition_offset_tracker(msg.topic, msg.partition)
@@ -247,7 +247,13 @@ class KafkaCommitOffsetManager(object):
         self._processed_message_tracker(topic).mark_message_ids_processed(msg_ids)
 
     def _mark_message_offset_done(self, msg_id):
-        topic_partition = self._message_topic_partitions.pop(msg_id)
+        topic_partition = self._message_topic_partitions.pop(msg_id, None)
+        if topic_partition is None:
+            _get_logger().error("KafkaCommitOffsetManager: Wanted to mark untracked message ID '%s' done; "
+                                "maybe unhandled duplicate?" %
+                                msg_id)
+            return
+
         _get_logger().debug("KafkaCommitOffsetManager: Message ID '%s' done on %s" %
                             (msg_id, topic_partition))
 
