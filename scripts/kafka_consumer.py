@@ -2,12 +2,12 @@
 
 
 import argparse
+import itertools
 import json
 from collections import defaultdict
 
 import colorama
 import six
-from future.moves import itertools
 from kafka.consumer.subscription_state import ConsumerRebalanceListener
 
 from kafka_python_helpers.kafka_client import new_kafka_json_consumer
