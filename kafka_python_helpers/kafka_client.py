@@ -75,7 +75,7 @@ def kafka_retriable(f):
                         time.sleep(delay)
                         delay += delay
                 elif isinstance(e, CommitFailedError):
-                    _get_logger().warn('Got Kafka commit error, ignoring')
+                    _get_logger().warning('Got Kafka commit error, ignoring')
                     return None
 
     return wrapper

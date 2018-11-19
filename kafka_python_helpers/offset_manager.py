@@ -225,7 +225,7 @@ class KafkaCommitOffsetManager(object):
         _get_logger().debug("KafkaCommitOffsetManager: Tracking message ID '%s'" % msg_id)
 
         if msg_id in self._message_topic_partitions:
-            _get_logger().warn("KafkaCommitOffsetManager: Duplicate message ID '%s', discarding" % msg_id)
+            _get_logger().warning("KafkaCommitOffsetManager: Duplicate message ID '%s', discarding" % msg_id)
             offset_tracker.push_id_and_offset(msg_id, msg.offset, as_done=True)
             return False
 
