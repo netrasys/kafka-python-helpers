@@ -1,11 +1,10 @@
 import json
 import sys
-import time
 from datetime import datetime
-from functools import wraps
 
 from kafka import KafkaConsumer, KafkaProducer, RoundRobinPartitioner
-from kafka.errors import KafkaError, CommitFailedError
+
+from kafka_python_helpers.decorators import kafka_retriable
 
 __logger = None
 __old_match_hostname = None
@@ -56,29 +55,6 @@ def _patch_ssl_IP_SAN_check():
     setattr(ssl_module, 'match_hostname', new_match_hostname)
 
     return ssl_module
-
-
-def kafka_retriable(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        delay = 1
-        while True:
-            try:
-                return f(*args, **kwargs)
-            except KafkaError as e:
-                if e.retriable:
-                    if delay > 30:
-                        _get_logger().error("Got Kafka retriable exception too many times, giving up: %s" % repr(e))
-                        raise
-                    else:
-                        _get_logger().debug("Got Kafka retriable exception, will retry in %ds: %s" % (delay, repr(e)))
-                        time.sleep(delay)
-                        delay += delay
-                elif isinstance(e, CommitFailedError):
-                    _get_logger().warning('Got Kafka commit error, ignoring')
-                    return None
-
-    return wrapper
 
 
 def _security_config(ssl_path_prefix):

@@ -242,6 +242,7 @@ class KafkaCommitOffsetManager(object):
         :param topic: topic name
         :param msg_ids: list of message IDs belonging to the topic
         """
+        assert isinstance(msg_ids, (list, tuple))
         _get_logger().debug("KafkaCommitOffsetManager: Marking message IDs %s done" % msg_ids)
 
         self._processed_message_tracker(topic).mark_message_ids_processed(msg_ids)
