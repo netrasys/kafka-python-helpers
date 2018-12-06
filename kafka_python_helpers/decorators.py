@@ -38,7 +38,7 @@ def kafka_retriable(f):
     return wrapper
 
 
-def kafka_retriable_future(callback, errback=None):
+def kafka_retriable_future(callback=None, errback=None):
     def outer_wrapper(f):
         @wraps(f)
         def inner_wrapper(*args, **kwargs):
@@ -71,7 +71,8 @@ def kafka_retriable_future(callback, errback=None):
                         sys.exit(1)
 
             future = f(*args, **kwargs)
-            future.add_callback(callback)
+            if callback is not None:
+                future.add_callback(callback)
             future.add_errback(on_future_error)
             return future
 

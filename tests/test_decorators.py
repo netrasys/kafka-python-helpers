@@ -1,5 +1,5 @@
 import pytest
-from kafka.errors import KafkaError, NodeNotReadyError
+from kafka.errors import NodeNotReadyError
 from kafka.future import Future
 from mock import patch
 
