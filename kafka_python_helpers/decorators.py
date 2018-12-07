@@ -38,7 +38,7 @@ def kafka_retriable(f):
     return wrapper
 
 
-def kafka_retriable_future(callback=None, errback=None):
+def kafka_retriable_future(callback, errback=None):
     def outer_wrapper(f):
         @wraps(f)
         def inner_wrapper(*args, **kwargs):
