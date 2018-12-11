@@ -45,8 +45,8 @@ class KafkaTopicConsumer(ConsumerRebalanceListener):
     def set_rebalance_listener(self, rebalance_listener):
         self._rebalance_listener = rebalance_listener
 
-    def consume(self, timeout_ms=None):
-        return self._kafka_consumer.poll(timeout_ms)
+    def consume(self, timeout_ms=None, max_records=None):
+        return self._kafka_consumer.poll(timeout_ms=timeout_ms, max_records=max_records)
 
     def commit_offsets(self, partition_offsets=None):
         """
