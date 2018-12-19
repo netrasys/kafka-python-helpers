@@ -56,20 +56,14 @@ def kafka_retriable_future(callback, errback=None):
                     future.add_errback(on_future_error)
                 else:
                     if errback:
-                        _get_logger().error("Got Kafka fatal error or too many retries in future, passing along: %r" %
-                                            e)
+                        _get_logger().error("Got Kafka fatal error or too many retries for '%s', passing along: %r" %
+                                            (f.__name__, e))
                         errback(e)
                     else:
-                        import inspect
-                        import traceback
                         from six.moves import _thread
 
-                        frame = inspect.currentframe()
-                        stack_trace = traceback.format_stack(frame)
                         _get_logger().error("Got Kafka fatal error or too many retries in future, exiting: %r" % e)
-                        _get_logger().error(''.join(stack_trace[:-2]))
-                        # os._exit(1)     # FIXME: This is very ugly (exit without cleanup)
-                        _thread.interrupt_main()
+                        _thread.interrupt_main()    # simulate Ctrl-C in main thread - FIXME: hides real exception
 
             future = f(*args, **kwargs)
             if callback is not None:
