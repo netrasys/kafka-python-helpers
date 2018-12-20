@@ -2,7 +2,6 @@ from collections import defaultdict, namedtuple
 
 import six
 from kafka import TopicPartition
-from sortedcontainers import SortedList
 
 from kafka_python_helpers.utils import compact_int_list
 
@@ -86,7 +85,7 @@ class KafkaMessageOffsetTracker(object):
         # (i.e. the offset of the last consumed message plus one)
         self._commit_offset = self._old_commit_offset = initial_offset
         self._ids_to_offsets = {}
-        self._done_offsets = SortedList()
+        self._done_offsets = set()
         self._done_ids = set()
 
     def _add_done_id_and_offset(self, id, offset):
@@ -98,7 +97,7 @@ class KafkaMessageOffsetTracker(object):
             while True:
                 self._done_offsets.remove(self._commit_offset)
                 self._commit_offset += 1
-        except ValueError:
+        except KeyError:
             pass
 
     def push_id_and_offset(self, id, offset, as_done=False):
@@ -129,7 +128,7 @@ class KafkaMessageOffsetTracker(object):
 
     def __repr__(self):
         return "KafkaMessageOffsetTracker(commit_offset=%d, dirty=%s, done_offsets=%s)" % \
-               (self._commit_offset, self.dirty(), compact_int_list(self._done_offsets))
+               (self._commit_offset, self.dirty(), compact_int_list(sorted(self._done_offsets)))
 
     def dirty(self):
         return self._commit_offset != self._old_commit_offset
