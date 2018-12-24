@@ -34,6 +34,8 @@ def kafka_retriable(f):
                 elif isinstance(e, CommitFailedError):
                     _get_logger().warning('Got Kafka commit error, ignoring')
                     return None
+                else:
+                    raise
 
     return wrapper
 
