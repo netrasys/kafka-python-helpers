@@ -1,4 +1,5 @@
 from collections import defaultdict, namedtuple
+from threading import Lock
 
 import six
 from kafka import TopicPartition
@@ -151,8 +152,7 @@ class KafkaMessageOffsetTracker(object):
 
 class KafkaCommitOffsetManager(object):
     """
-    Singleton object that tracks processed offsets in all topics.
-    Not thread/process safe!
+    Thread-safe object that tracks processed offsets in all topics. Designed to be used as a singleton.
     """
     _TopicData = namedtuple('_TopicData', 'processed_message_tracker partition_offset_trackers')
 
@@ -163,6 +163,7 @@ class KafkaCommitOffsetManager(object):
         self._topic_datas = {}
         self._message_topic_partitions = {}
         self._processed_message_trackers = set()
+        self._lock = Lock()
 
         _get_logger().debug("KafkaCommitOffsetManager: Tracking %s" % list(topic_processed_message_trackers.keys()))
 
@@ -175,6 +176,7 @@ class KafkaCommitOffsetManager(object):
                                                        partition_offset_trackers=defaultdict(KafkaMessageOffsetTracker))
 
     def _processed_message_tracker(self, topic):
+        # Processed message trackers are immutable, no need for locking
         return self._topic_datas[topic].processed_message_tracker
 
     def _partition_offset_tracker(self, topic, partition, delete=False):
@@ -184,6 +186,7 @@ class KafkaCommitOffsetManager(object):
             return self._topic_datas[topic].partition_offset_trackers[partition]
 
     def _get_message_id(self, msg):
+        # Processed message trackers are immutable, no need for locking
         processed_message_tracker = self._processed_message_tracker(msg.topic)
         return processed_message_tracker.get_message_id(msg.value)
 
@@ -197,56 +200,6 @@ class KafkaCommitOffsetManager(object):
                 _get_logger().debug("KafkaCommitOffsetManager: Got processed IDs: %s" % processed_ids)
 
         return all_processed_ids
-
-    def reset_topic_partition(self, topic, partition):
-        """
-        Clear a topic partition's state.
-        :param topic: topic name
-        :param partition: partition index
-        """
-        _get_logger().debug("KafkaCommitOffsetManager: Resetting offsets for topic '%s' partition %d" %
-                            (topic, partition))
-
-        offset_tracker = self._partition_offset_tracker(topic, partition, delete=True)
-        if offset_tracker is not None:
-            msg_ids = offset_tracker.get_all_ids()
-            self._processed_message_tracker(topic).remove_message_ids(list(msg_ids))
-
-    def watch_message(self, msg):
-        """
-        Watch a message for "done-ness".
-        When it is done, its consumer offset can be committed.
-        :type msg: KafkaMessage
-        :rtype: bool
-        :returns True if message was added, False if it was a duplicate (therefore discarded)
-        """
-        msg_id = self._get_message_id(msg)
-        offset_tracker = self._partition_offset_tracker(msg.topic, msg.partition)
-
-        _get_logger().debug("KafkaCommitOffsetManager: Tracking message ID '%s'" % msg_id)
-
-        if msg_id in self._message_topic_partitions:
-            _get_logger().warning("KafkaCommitOffsetManager: Duplicate message ID '%s', discarding" % msg_id)
-            offset_tracker.push_id_and_offset(msg_id, msg.offset, as_done=True)
-            return False
-
-        offset_tracker.push_id_and_offset(msg_id, msg.offset)
-
-        self._message_topic_partitions[msg_id] = TopicPartition(msg.topic, msg.partition)
-
-        return True
-
-    def mark_message_ids_done(self, topic, msg_ids):
-        """
-        Convenience method to mark a topic's messages as "done" through the manager instead of through the assigned
-        processed message tracker.
-        :param topic: topic name
-        :param msg_ids: list of message IDs belonging to the topic
-        """
-        assert isinstance(msg_ids, (list, tuple))
-        _get_logger().debug("KafkaCommitOffsetManager: Marking message IDs %s done" % msg_ids)
-
-        self._processed_message_tracker(topic).mark_message_ids_processed(msg_ids)
 
     def _mark_message_offset_done(self, msg_id):
         topic_partition = self._message_topic_partitions.pop(msg_id, None)
@@ -275,6 +228,59 @@ class KafkaCommitOffsetManager(object):
                                 {topic: dict(topic_data.partition_offset_trackers)
                                  for topic, topic_data in six.iteritems(self._topic_datas)})
 
+    def reset_topic_partition(self, topic, partition):
+        """
+        Clear a topic partition's state.
+        :param topic: topic name
+        :param partition: partition index
+        """
+        with self._lock:
+            _get_logger().debug("KafkaCommitOffsetManager: Resetting offsets for topic '%s' partition %d" %
+                                (topic, partition))
+
+            offset_tracker = self._partition_offset_tracker(topic, partition, delete=True)
+            if offset_tracker is not None:
+                msg_ids = offset_tracker.get_all_ids()
+                self._processed_message_tracker(topic).remove_message_ids(list(msg_ids))
+
+    def watch_message(self, msg):
+        """
+        Watch a message for "done-ness".
+        When it is done, its consumer offset can be committed.
+        :type msg: KafkaMessage
+        :rtype: bool
+        :returns True if message was added, False if it was a duplicate (therefore discarded)
+        """
+        msg_id = self._get_message_id(msg)
+        _get_logger().debug("KafkaCommitOffsetManager: Tracking message ID '%s'" % msg_id)
+
+        with self._lock:
+            offset_tracker = self._partition_offset_tracker(msg.topic, msg.partition)
+
+            if msg_id in self._message_topic_partitions:
+                _get_logger().warning("KafkaCommitOffsetManager: Duplicate message ID '%s', discarding" % msg_id)
+                is_duplicate = True
+            else:
+                is_duplicate = False
+                self._message_topic_partitions[msg_id] = TopicPartition(msg.topic, msg.partition)
+
+            offset_tracker.push_id_and_offset(msg_id, msg.offset, as_done=is_duplicate)
+
+            return not is_duplicate
+
+    def mark_message_ids_done(self, topic, msg_ids):
+        """
+        Convenience method to mark a topic's messages as "done" through the manager instead of through the assigned
+        processed message tracker.
+        :param topic: topic name
+        :param msg_ids: list of message IDs belonging to the topic
+        """
+        assert isinstance(msg_ids, (list, tuple))
+        _get_logger().debug("KafkaCommitOffsetManager: Marking message IDs %s done" % msg_ids)
+
+        with self._lock:
+            self._processed_message_tracker(topic).mark_message_ids_processed(msg_ids)
+
     def pop_offsets_to_commit(self):
         # type: () -> dict[TopicPartition, int]
         """
@@ -284,14 +290,15 @@ class KafkaCommitOffsetManager(object):
         """
         offsets = {}
 
-        self._update_done_offsets()
+        with self._lock:
+            self._update_done_offsets()
 
-        for topic, topic_data in six.iteritems(self._topic_datas):
-            for partition, tracker in six.iteritems(topic_data.partition_offset_trackers):
-                if tracker.dirty():
-                    topic_partition = TopicPartition(topic, partition)
-                    offsets[topic_partition] = tracker.get_offset_to_commit()
-                    tracker.commit_done_ids()
+            for topic, topic_data in six.iteritems(self._topic_datas):
+                for partition, tracker in six.iteritems(topic_data.partition_offset_trackers):
+                    if tracker.dirty():
+                        topic_partition = TopicPartition(topic, partition)
+                        offsets[topic_partition] = tracker.get_offset_to_commit()
+                        tracker.commit_done_ids()
 
         if offsets:
             _get_logger().debug("KafkaCommitOffsetManager: Offsets to commit: %s" % offsets)
