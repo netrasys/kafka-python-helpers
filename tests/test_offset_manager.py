@@ -1,5 +1,5 @@
 import pytest
-from kafka import TopicPartition, OffsetAndMetadata
+from kafka import TopicPartition
 from kafka.structs import KafkaMessage
 
 from kafka_python_helpers.offset_manager import KafkaMessageOffsetTracker, KafkaProcessedMessageTracker, \
@@ -69,7 +69,7 @@ class TestKafkaMessageOffsetTracker(object):
 
         assert tracker.get_all_ids() == {1, 2, 3, 4}
 
-    def test_clear_dirty_resets_done_ids(self):
+    def test_commit_done_ids_resets_done_ids(self):
         tracker = KafkaMessageOffsetTracker()
 
         tracker.push_id_and_offset(1, 11)
@@ -82,7 +82,7 @@ class TestKafkaMessageOffsetTracker(object):
 
         assert tracker.get_done_ids() == {2, 4}
 
-        tracker.clear_dirty()
+        tracker.commit_done_ids()
         assert tracker.get_done_ids() == set()
 
 

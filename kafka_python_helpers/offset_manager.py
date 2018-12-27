@@ -80,31 +80,36 @@ class KafkaMessageOffsetTracker(object):
     "processed" ids).
     """
 
-    def __init__(self, initial_offset=-1):
+    def __init__(self, last_committed_offset=0):
         # The commit offset is actually the offset of the *next* message to be consumed
         # (i.e. the offset of the last consumed message plus one)
-        self._commit_offset = self._old_commit_offset = initial_offset
+        self._last_committed_offset = last_committed_offset
+        self._offset_to_commit = last_committed_offset
+        self._dirty = False
         self._ids_to_offsets = {}
         self._done_offsets = set()
         self._done_ids = set()
 
+    def _update_offset_to_commit(self):
+        self._offset_to_commit = self._last_committed_offset
+        while self._offset_to_commit in self._done_offsets:
+            self._offset_to_commit += 1
+
+        self._dirty = self._offset_to_commit != self._last_committed_offset
+
     def _add_done_id_and_offset(self, id, offset):
+        assert self._last_committed_offset >= 0
+        assert offset >= self._last_committed_offset
+
         self._done_ids.add(id)
         self._done_offsets.add(offset)
 
-        # Update last processed offset
-        try:
-            while True:
-                self._done_offsets.remove(self._commit_offset)
-                self._commit_offset += 1
-        except KeyError:
-            pass
+        self._update_offset_to_commit()
 
     def push_id_and_offset(self, id, offset, as_done=False):
         # Detect last committed offset, if not known
-        if self._commit_offset < 0 or self._commit_offset > offset:
-            self._commit_offset = offset
-            self._old_commit_offset = self._commit_offset  # not dirty since it was already committed
+        if self._last_committed_offset <= 0 or self._last_committed_offset > offset:
+            self._last_committed_offset = offset
 
         # Skip duplicate id (i.e. mark its offset "done")
         if as_done or id in self._ids_to_offsets:
@@ -118,27 +123,24 @@ class KafkaMessageOffsetTracker(object):
 
         self._add_done_id_and_offset(id, offset)
 
-    def filter_popped_ids(self, ids):
-        """
-        Return a set of ids in 'ids' that are no longer tracked.
-        :param ids: iterable of message IDs
-        :return: set
-        """
-        return {id for id in ids if id not in self._ids_to_offsets}
-
     def __repr__(self):
         return "KafkaMessageOffsetTracker(commit_offset=%d, dirty=%s, done_offsets=%s)" % \
-               (self._commit_offset, self.dirty(), compact_int_list(sorted(self._done_offsets)))
+               (self._offset_to_commit, self.dirty(), compact_int_list(sorted(self._done_offsets)))
 
     def dirty(self):
-        return self._commit_offset != self._old_commit_offset
+        return self._dirty
 
-    def clear_dirty(self):
-        self._old_commit_offset = self._commit_offset
+    def commit_done_ids(self):
+        # All offsets in the range must be in '_done_offsets', so 'remove' should never fail
+        for offset in range(self._last_committed_offset, self._offset_to_commit):
+            self._done_offsets.remove(offset)
+
+        self._last_committed_offset = self._offset_to_commit
         self._done_ids = set()
+        self._dirty = False
 
     def get_offset_to_commit(self):
-        return self._commit_offset
+        return self._offset_to_commit
 
     def get_all_ids(self):
         return self._done_ids | set(self._ids_to_offsets.keys())
@@ -289,7 +291,7 @@ class KafkaCommitOffsetManager(object):
                 if tracker.dirty():
                     topic_partition = TopicPartition(topic, partition)
                     offsets[topic_partition] = tracker.get_offset_to_commit()
-                    tracker.clear_dirty()
+                    tracker.commit_done_ids()
 
         if offsets:
             _get_logger().debug("KafkaCommitOffsetManager: Offsets to commit: %s" % offsets)
