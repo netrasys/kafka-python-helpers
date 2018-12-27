@@ -125,8 +125,9 @@ class KafkaMessageOffsetTracker(object):
         self._add_done_id_and_offset(id, offset)
 
     def __repr__(self):
-        return "KafkaMessageOffsetTracker(commit_offset=%d, dirty=%s, done_offsets=%s)" % \
-               (self._offset_to_commit, self.dirty(), compact_int_list(sorted(self._done_offsets)))
+        return "KafkaMessageOffsetTracker(last_committed_offset=%d, offset_to_commit=%d, dirty=%s, done_offsets=%s)" % \
+               (self._last_committed_offset, self._offset_to_commit, self.dirty(),
+                compact_int_list(sorted(self._done_offsets)))
 
     def dirty(self):
         return self._dirty
