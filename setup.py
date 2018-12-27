@@ -36,7 +36,7 @@ class PyTest(TestCommand):
 
 setup(
     name='kafka-python-helpers',
-    version='0.5.14',
+    version='0.5.15',
     url='http://github.com/netrasys/kafka-python-helpers',
     license='Netra Inc. Proprietary',
     author='Sorin Otescu',

@@ -228,14 +228,14 @@ class KafkaCommitOffsetManager(object):
                                 {topic: dict(topic_data.partition_offset_trackers)
                                  for topic, topic_data in six.iteritems(self._topic_datas)})
 
-    def reset_topic_partition(self, topic, partition):
+    def remove_topic_partition(self, topic, partition):
         """
-        Clear a topic partition's state.
+        Remove a topic partition and un-track its messages.
         :param topic: topic name
         :param partition: partition index
         """
         with self._lock:
-            _get_logger().debug("KafkaCommitOffsetManager: Resetting offsets for topic '%s' partition %d" %
+            _get_logger().debug("KafkaCommitOffsetManager: Removing topic '%s' partition %d" %
                                 (topic, partition))
 
             offset_tracker = self._partition_offset_tracker(topic, partition, delete=True)

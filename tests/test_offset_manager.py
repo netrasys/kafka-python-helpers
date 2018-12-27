@@ -200,7 +200,7 @@ class TestKafkaCommitOffsetManager(object):
         offset_manager.mark_message_ids_done('foo', [1000])
         assert offset_manager.pop_offsets_to_commit() == self._build_offsets(('foo', 0, 101))
 
-    def test_reset_topic_partition_resets_single_topic_partition(self):
+    def test_remove_topic_partition_removes_single_topic_partition(self):
         done_tracker_foo = self._DummyDoneIdsTracker()
         done_tracker_bar = self._DummyDoneIdsTracker()
 
@@ -223,7 +223,7 @@ class TestKafkaCommitOffsetManager(object):
         assert done_tracker_foo.done_ids == [1000, 1001]
         assert done_tracker_bar.done_ids == [2000]
 
-        offset_manager.reset_topic_partition('foo', 0)
+        offset_manager.remove_topic_partition('foo', 0)
 
         assert done_tracker_foo.done_ids == [1001]
         assert done_tracker_bar.done_ids == [2000]

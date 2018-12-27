@@ -150,8 +150,8 @@ class KafkaTopicCommitOffsetManager(object):
         return {tp.partition: offset
                 for tp, offset in six.iteritems(self._commit_offset_manager.pop_offsets_to_commit())}
 
-    def reset_partition(self, partition):
-        self._commit_offset_manager.reset_topic_partition(self._topic, partition)
+    def remove_partition(self, partition):
+        self._commit_offset_manager.remove_topic_partition(self._topic, partition)
 
     def __getattr__(self, item):
         return self._commit_offset_manager.__getattribute__(item)
