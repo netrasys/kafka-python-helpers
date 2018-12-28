@@ -14,7 +14,7 @@ class TestKafkaMessageOffsetTracker(object):
         tracker.push_id_and_offset(11, 100)
         tracker.pop_id(11)  # should not raise
 
-    def test_pop_id_updates_last_offset_with_min_offset_if_not_passed_through_constructor(self):
+    def test_pop_id_updates_last_offset_from_min_offset_if_not_passed_through_constructor(self):
         tracker = KafkaMessageOffsetTracker()
 
         tracker.push_id_and_offset(4, 14)
@@ -22,9 +22,12 @@ class TestKafkaMessageOffsetTracker(object):
         tracker.push_id_and_offset(2, 12)
         tracker.push_id_and_offset(3, 13)
 
-        # last offset was not known, so we assume it's 11 (equal to lowest message offset)
-        tracker.pop_id(2)
-        assert tracker.get_offset_to_commit() == 11
+        # First offset (11) not yet done, so nothing to commit
+        assert tracker.consume_offset_to_commit() is None
+
+        # Commit offset 11, 12 is the next offset to read from in case of restart
+        tracker.pop_id(1)
+        assert tracker.consume_offset_to_commit() == 12
 
     def test_pop_id_updates_last_offset(self):
         tracker = KafkaMessageOffsetTracker(10)
@@ -35,15 +38,15 @@ class TestKafkaMessageOffsetTracker(object):
         tracker.push_id_and_offset(3, 12)
 
         tracker.pop_id(2)
-        assert tracker.get_offset_to_commit() == 10
+        assert tracker.consume_offset_to_commit() is None
         tracker.pop_id(1)
-        assert tracker.get_offset_to_commit() == 12
+        assert tracker.consume_offset_to_commit() == 12
         tracker.pop_id(4)
-        assert tracker.get_offset_to_commit() == 12
+        assert tracker.consume_offset_to_commit() is None   # offset hasn't advanced
         tracker.pop_id(3)
-        assert tracker.get_offset_to_commit() == 14
+        assert tracker.consume_offset_to_commit() == 14
 
-    def test_get_done_ids_returns_popped_ids(self):
+    def test_get_all_ids_returns_all_not_yet_done_ids(self):
         tracker = KafkaMessageOffsetTracker()
 
         tracker.push_id_and_offset(1, 11)
@@ -54,36 +57,24 @@ class TestKafkaMessageOffsetTracker(object):
         tracker.pop_id(2)
         tracker.pop_id(4)
 
-        assert tracker.get_done_ids() == {2, 4}
+        assert tracker.get_all_ids() == [1, 3]
 
-    def test_get_all_ids_returns_all_ids(self):
+    def test_push_id_and_offset_with_same_id_twice_keeps_latest_offset(self):
         tracker = KafkaMessageOffsetTracker()
 
         tracker.push_id_and_offset(1, 11)
         tracker.push_id_and_offset(2, 12)
-        tracker.push_id_and_offset(3, 13)
-        tracker.push_id_and_offset(4, 14)
 
         tracker.pop_id(2)
-        tracker.pop_id(4)
 
-        assert tracker.get_all_ids() == {1, 2, 3, 4}
+        # First message not consumed, so no offset to commit yet
+        assert tracker.consume_offset_to_commit() is None
 
-    def test_commit_done_ids_resets_done_ids(self):
-        tracker = KafkaMessageOffsetTracker()
+        tracker.push_id_and_offset(1, 13)
 
-        tracker.push_id_and_offset(1, 11)
-        tracker.push_id_and_offset(2, 12)
-        tracker.push_id_and_offset(3, 13)
-        tracker.push_id_and_offset(4, 14)
-
-        tracker.pop_id(2)
-        tracker.pop_id(4)
-
-        assert tracker.get_done_ids() == {2, 4}
-
-        tracker.commit_done_ids()
-        assert tracker.get_done_ids() == set()
+        # We have a duplicate message for ID 1, so its earliest offset (11) should be marked done.
+        # Since ID 2 is already done, we can commit the first two offsets (11 and 12).
+        assert tracker.consume_offset_to_commit() == 13
 
 
 class TestKafkaCommitOffsetManager(object):

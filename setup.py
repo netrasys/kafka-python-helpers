@@ -24,7 +24,7 @@ class PyTest(TestCommand):
         TestCommand.finalize_options(self)
         self.test_args = [
             '--strict',
-            '--verbose',
+            '-vv',
             '--tb=long',
             'tests']
         self.test_suite = True
@@ -36,7 +36,7 @@ class PyTest(TestCommand):
 
 setup(
     name='kafka-python-helpers',
-    version='0.5.16',
+    version='0.6.0',
     url='http://github.com/netrasys/kafka-python-helpers',
     license='Netra Inc. Proprietary',
     author='Sorin Otescu',

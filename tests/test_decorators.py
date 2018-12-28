@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 from kafka.errors import NodeNotReadyError
 from kafka.future import Future
@@ -41,7 +43,10 @@ def test_kafka_retriable_future_calls_success_callback_on_success(patched_sleep)
     def on_success(value):
         state['value'] = value
 
-    @kafka_retriable_future(on_success)
+    def on_error(e):
+        state['error'] = repr(e)
+
+    @kafka_retriable_future(on_success, on_error)
     def foo():
         return Future()
 
@@ -58,7 +63,10 @@ def test_kafka_retriable_future_retries_retriable_exception(patched_sleep):
     def on_success(value):
         state['value'] = value
 
-    @kafka_retriable_future(on_success)
+    def on_error(e):
+        state['error'] = repr(e)
+
+    @kafka_retriable_future(on_success, on_error)
     def foo():
         state['tries'] += 1
         if state['tries'] < 2:
@@ -91,7 +99,8 @@ def test_kafka_retriable_future_tries_at_most_6_times(patched_sleep):
 
 
 @patch('time.sleep', return_value=None)
-def test_kafka_retriable_future_exits_process_on_fatal_error_if_no_errback(patched_sleep):
+@patch('six.moves._thread.interrupt_main', side_effect=sys.exit)
+def test_kafka_retriable_future_exits_process_on_fatal_error_if_no_errback(patched_sleep, patched_interrupt_main):
     state = {}
 
     def on_success(value):
