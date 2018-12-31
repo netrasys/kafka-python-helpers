@@ -81,23 +81,31 @@ class KafkaMessageOffsetTracker(object):
     "processed" ids).
     """
 
-    def __init__(self, last_committed_offset=0):
+    def __init__(self):
         # The commit offset is actually the offset of the *next* message to be consumed
         # (i.e. the offset of the last consumed message plus one)
-        self._last_committed_offset = last_committed_offset
+        self._last_committed_offset = -1    # must be initialised by 'set_last_committed_offset_if_needed'
         self._ids_to_offsets = {}
         self._done_offsets = set()
 
     def _add_done_offset(self, offset):
+        _get_logger().debug("KafkaMessageOffsetTracker: Add done offset %d" % offset)
+
         assert self._last_committed_offset >= 0
         assert offset >= self._last_committed_offset
 
         self._done_offsets.add(offset)
 
-    def push_id_and_offset(self, id, offset, as_done=False):
-        # Detect last committed offset, if not known
-        if self._last_committed_offset <= 0 or self._last_committed_offset > offset:
+    def set_last_committed_offset_if_needed(self, offset):
+        if self._last_committed_offset == -1:
             self._last_committed_offset = offset
+        else:
+            # Messages are supposed to come from incrementing offsets
+            assert self._last_committed_offset < offset
+
+    def push_id_and_offset(self, id, offset, as_done=False):
+        # 'set_last_committed_offset_if_needed' must be called before this
+        assert self._last_committed_offset >= 0
 
         # Skip duplicate id (i.e. mark its offset "done")
         if id in self._ids_to_offsets:
@@ -129,6 +137,9 @@ class KafkaMessageOffsetTracker(object):
                (self._last_committed_offset, compact_int_list(sorted(self._done_offsets)))
 
     def consume_offset_to_commit(self):
+        if self._last_committed_offset == -1:
+            return None
+
         offset_to_commit = self._last_committed_offset
         while offset_to_commit in self._done_offsets:
             self._done_offsets.remove(offset_to_commit)
@@ -208,6 +219,10 @@ class KafkaCommitOffsetManager(object):
 
         self._partition_offset_tracker(topic_partition.topic, topic_partition.partition).pop_id(msg_id)
 
+    def _update_committed_partition_offset(self, msg):
+        offset_tracker = self._partition_offset_tracker(msg.topic, msg.partition)
+        offset_tracker.set_last_committed_offset_if_needed(msg.offset)
+
     def _update_done_offsets(self):
         """
         Update "done" offsets for all monitored topics and partitions.
@@ -252,6 +267,8 @@ class KafkaCommitOffsetManager(object):
         :returns True if message was added, False if it was a duplicate (therefore discarded)
         """
         msg_id = self._get_message_id(msg)
+        self._update_committed_partition_offset(msg)
+
         _get_logger().debug("KafkaCommitOffsetManager: Tracking message ID '%s'" % msg_id)
 
         with self._lock:

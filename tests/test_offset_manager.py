@@ -8,29 +8,18 @@ from kafka_python_helpers.offset_manager import KafkaMessageOffsetTracker, Kafka
 
 class TestKafkaMessageOffsetTracker(object):
     def test_pop_id_requires_existing_id(self):
-        tracker = KafkaMessageOffsetTracker(10)
+        tracker = KafkaMessageOffsetTracker()
+        tracker.set_last_committed_offset_if_needed(10)
+
         with pytest.raises(AssertionError):
             tracker.pop_id(11)
         tracker.push_id_and_offset(11, 100)
         tracker.pop_id(11)  # should not raise
 
-    def test_pop_id_updates_last_offset_from_min_offset_if_not_passed_through_constructor(self):
-        tracker = KafkaMessageOffsetTracker()
-
-        tracker.push_id_and_offset(4, 14)
-        tracker.push_id_and_offset(1, 11)
-        tracker.push_id_and_offset(2, 12)
-        tracker.push_id_and_offset(3, 13)
-
-        # First offset (11) not yet done, so nothing to commit
-        assert tracker.consume_offset_to_commit() is None
-
-        # Commit offset 11, 12 is the next offset to read from in case of restart
-        tracker.pop_id(1)
-        assert tracker.consume_offset_to_commit() == 12
-
     def test_pop_id_updates_last_offset(self):
-        tracker = KafkaMessageOffsetTracker(10)
+        tracker = KafkaMessageOffsetTracker()
+        tracker.set_last_committed_offset_if_needed(10)
+
         # random order
         tracker.push_id_and_offset(4, 13)
         tracker.push_id_and_offset(1, 10)
@@ -48,6 +37,7 @@ class TestKafkaMessageOffsetTracker(object):
 
     def test_get_all_ids_returns_all_not_yet_done_ids(self):
         tracker = KafkaMessageOffsetTracker()
+        tracker.set_last_committed_offset_if_needed(10)
 
         tracker.push_id_and_offset(1, 11)
         tracker.push_id_and_offset(2, 12)
@@ -61,6 +51,7 @@ class TestKafkaMessageOffsetTracker(object):
 
     def test_push_id_and_offset_with_same_id_twice_keeps_latest_offset(self):
         tracker = KafkaMessageOffsetTracker()
+        tracker.set_last_committed_offset_if_needed(11)
 
         tracker.push_id_and_offset(1, 11)
         tracker.push_id_and_offset(2, 12)
