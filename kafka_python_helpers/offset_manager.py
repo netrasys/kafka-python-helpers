@@ -101,7 +101,7 @@ class KafkaMessageOffsetTracker(object):
             self._last_committed_offset = offset
         else:
             # Messages are supposed to come from incrementing offsets
-            assert self._last_committed_offset < offset
+            assert self._last_committed_offset <= offset
 
     def push_id_and_offset(self, id, offset, as_done=False):
         # 'set_last_committed_offset_if_needed' must be called before this
