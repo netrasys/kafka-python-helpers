@@ -1,7 +1,7 @@
 import json
 import sys
-from datetime import datetime
 
+from datetime import datetime
 from kafka import KafkaConsumer, KafkaProducer, RoundRobinPartitioner
 
 from kafka_python_helpers.decorators import kafka_retriable
@@ -17,8 +17,8 @@ def _get_logger():
         __logger = logging.getLogger(__name__)
 
     return __logger
-    
-    
+
+
 class _DateTimeJsonEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, datetime):
@@ -105,7 +105,14 @@ def new_kafka_json_consumer(consumer_name, bootstrap_servers, consumer_group_id,
     return init_consumer()
 
 
-def new_kafka_json_producer(bootstrap_servers, ssl_path_prefix=None, partitioner=None,
+def _serialize_json(msg):
+    return json.dumps(msg, cls=_DateTimeJsonEncoder, default=str).encode('utf-8')
+
+
+def new_kafka_json_producer(bootstrap_servers,
+                            ssl_path_prefix=None,
+                            partitioner=None,
+                            value_serializer=None,
                             **kafka_producer_args):
     if partitioner is None:
         partitioner = RoundRobinPartitioner()
@@ -121,13 +128,16 @@ def new_kafka_json_producer(bootstrap_servers, ssl_path_prefix=None, partitioner
                           partitioner=partitioner)
         extra_args.update(kafka_producer_args)
 
+        serializer = _serialize_json
+        if value_serializer is not None:
+            serializer = value_serializer
+
         return KafkaProducer(bootstrap_servers=bootstrap_servers,
                              security_protocol=security_cfg['security_protocol'],
                              ssl_cafile=security_cfg['ssl_cafile'],
                              ssl_certfile=security_cfg['ssl_certfile'],
                              ssl_keyfile=security_cfg['ssl_keyfile'],
-                             value_serializer=lambda m: json.dumps(m, cls=_DateTimeJsonEncoder,
-                                                                   default=str).encode('utf-8'),
+                             value_serializer=serializer,
                              **extra_args)
 
     return init_producer()
